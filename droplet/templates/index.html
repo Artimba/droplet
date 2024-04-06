@@ -1,18 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Sensor Data Live Graph</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <title>Droplet Tool</title>
 </head>
 <body>
-    <h1>Sensor Data Live Graph</h1>
-    <button id="captureButton">Capture Data</button>
-    <div id="graph"></div>
-    <div id="sensorData">
-        <p id="temperature">Temperature: </p>
-        <p id="humidity">Humidity: </p>
-        <img id="capturedImage" src="" alt="Captured Image" style="display: none;" width="500" height="auto"/>
+    <button id="liveGraph">Go To Live Graph</button>
+    <br>
+    <!-- Wrap box in a border with padding-->
+    <div style="border: 1px solid black; padding: 10px;">
+        <h2>Temperature and Humidity Data</h2>
+        <p>Click the button below to capture data from the sensor.</p>
+        <p>The data will be displayed below the button.</p>
+        <button id="captureButton">Capture Data</button>
+        <div id="graph"></div>
+        <div id="sensorData">
+            <img id="capturedImage" src="" alt="Captured Image" style="display: none;" width="500" height="auto"/>
+            <p id="temperature">Temperature: </p>
+            <p id="humidity">Humidity: </p>
+        </div>
     </div>
+
     <script>
         document.getElementById('captureButton').addEventListener('click', function() {
             fetch('/api/capture', {method: 'POST'})
@@ -33,9 +40,10 @@
                 })
                 .catch(error => console.error('Error capturing data:', error));
         });
-        
-        // JavaScript to update the graph in real-time
-        // Add your existing or new Plotly graph code here
+
+        document.getElementById('liveGraph').addEventListener('click', function() {
+            window.location.href = '/live-graph';
+        });
     </script>
 </body>
 </html>
