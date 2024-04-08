@@ -58,7 +58,7 @@ def capture_image(pic_id: int) -> str:
         file_path = os.path.join(image_dir, filename)
         # Capture the image. Save the image file name.
         gp("--capture-image-and-download", "--filename", file_path)
-        print("Image captured.")
+        print(f"Image captured. Saved to {file_path}")
         return filename
     except Exception as e:
         if os.getenv('DEBUG_MODE') == "True":
