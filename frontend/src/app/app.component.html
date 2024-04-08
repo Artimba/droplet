@@ -4,9 +4,9 @@
       <p>Choose an experiment to start gathering data.</p>
       <mat-form-field appearance="fill">
         <mat-label>Choose an experiment</mat-label>
-        <mat-select [(value)]="selectedExperiment">
-          <mat-option *ngFor="let experiment of experiments" [value]="experiment">
-            {{ experiment }}
+        <mat-select [(value)]="selectedExperimentId" (selectionChange)="onExperimentSelected($event.value)">
+          <mat-option *ngFor="let experiment of experiments" [value]="experiment.id">
+            {{ experiment.name }}
           </mat-option>
         </mat-select>
       </mat-form-field>
@@ -15,6 +15,19 @@
     </div>
     
     <!-- Rest of your Data Gathering content -->
+    <div *ngIf="selectedExperimentId">
+      <button mat-raised-button color="primary" (click)="captureData()">Capture Data</button>
+    
+      <!-- Display the last captured data if available -->
+      <div *ngIf="lastCapturedData" style="max-width: 50%; margin: 0 auto; padding: 20px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); border-radius: 10px;">
+        <img [src]="'/static/images/' + lastCapturedData.image_filename" alt="Captured Image" style="max-width: 100%; max-height: 400px; display: block; margin: 0 auto;">
+        <div style="text-align: center; padding-top: 10px;">
+          <p>Temperature: {{ lastCapturedData.temperature }}°C</p>
+          <p>Humidity: {{ lastCapturedData.humidity }}%</p>
+        </div>
+      </div>
+      
+    </div>
   </mat-tab>
   <mat-tab label="Live Sensor View">
     <div id="sensorGraphs">

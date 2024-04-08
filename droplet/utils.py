@@ -8,6 +8,7 @@ import subprocess
 import smbus
 import math
 import time
+import random
 from shutil import copyfile
 
 # Initalize I2C bus for reading from sensor
@@ -87,7 +88,7 @@ def read_sensor_data():
             exit(1)
 
 def mock_sensor_data():
-    return {'temperature': 25.0, 'humidity': 50.0}
+    return {'temperature': random.randint(40, 80), 'humidity': random.randint(15, 20)}
 
 def mock_capture_image(shot_time: str, pic_id: int) -> str:
     # Make a copy of droplet_20240404T133433.jpg, assigning it a new name.

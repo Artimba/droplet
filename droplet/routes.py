@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, render_template, send_from_directory, abort, current_app, Response
+from flask import Blueprint, jsonify, render_template, send_from_directory, abort, current_app, Response, request
 import plotly
 import plotly.graph_objs as go
 import json
@@ -12,6 +12,8 @@ from . import db
 # Blueprint for main routes
 bp = Blueprint('main', __name__)
 
+current_experiment = -1
+
 # @bp.route('/')
 # def index() -> str:
 #     return render_template('index.html')
@@ -20,7 +22,7 @@ bp = Blueprint('main', __name__)
 # def live_graph() -> str:
 #     return render_template('live_graph.html')
     
-@bp.route('/api/capture', methods=['POST'])
+@bp.route('/api/data/capture', methods=['POST'])
 def capture() -> Response:
     """Send an instruction to the Canon camera to capture and download an image. 
     Create a new data entry containing the image and save it under the current Experiment.
@@ -28,11 +30,16 @@ def capture() -> Response:
     Returns:
         Response: JSON response containing the ID of the new data entry
     """
+    global current_experiment
+    if current_experiment == -1:
+        return jsonify({'error': 'No current experiment set'}), 400
+    
     filename = capture_image("droplet")
     data = read_sensor_data()
     new_entry = DataEntry(temperature = data['temperature'],
                           humidity = data['humidity'],
-                          image_filename = filename)
+                          image_filename = filename,
+                          experiment_id = current_experiment)
     db.session.add(new_entry)
     db.session.commit()
     return jsonify({'id': new_entry.id})
@@ -53,7 +60,7 @@ def capture() -> Response:
 #         return jsonify({'error': 'Entry not found'}), 404
 
 
-@bp.route('/images/<filename>')
+@bp.route('/static/images/<filename>')
 def serve_image(filename: str) -> Response:
     """Serve an image from the image directory
 
@@ -82,17 +89,14 @@ def get_sensor_data() -> Response:
 
 # Create CRUD operations for Experiment and DataEntry Models
 @bp.route('/api/experiments', methods=['POST'])
-def create_experiment() -> Response:
-    """Create a new experiment
-
-    Returns:
-        Response: JSON response containing new experiment
-    """
-    data = requests.get_json()
-    new_experiment = Experiment(name=data['name'], description=data['description'])
+def create_experiment():
+    """Create a new experiment"""
+    data = request.get_json()
+    new_experiment = Experiment(name=data['name'], description=data.get('description', ''))
     db.session.add(new_experiment)
     db.session.commit()
-    return jsonify(new_experiment.to_dict())
+    return jsonify(new_experiment.to_dict()), 201  # Use 201 status code for resource creation
+
 
 @bp.route('/api/experiments', methods=['GET'])
 def get_experiments() -> Response:
@@ -130,7 +134,7 @@ def update_experiment(experiment_id: int) -> Response:
     Returns:
         Response: JSON response containing updated experiment
     """
-    data = requests.get_json()
+    data = request.get_json()
     experiment = Experiment.query.get(experiment_id)
     if experiment:
         experiment.name = data['name']
@@ -158,7 +162,15 @@ def delete_experiment(experiment_id: int) -> Response:
         return jsonify({'message': 'Experiment deleted'})
     else:
         return jsonify({'error': 'Experiment not found'}), 404
-    
+
+@bp.route('/api/experiments/select/<int:experiment_id>', methods=['POST'])
+def update_current_experiment(experiment_id):
+    """Update the current experiment based on the provided ID."""
+    global current_experiment
+    current_experiment = experiment_id
+    return jsonify({'message': 'Current experiment set', 'current_experiment_id': current_experiment})
+
+
 # Create a data entry for a given experiment id.
 @bp.route('/api/experiments/<int:experiment_id>/data', methods=['POST'])
 def create_data_entry(experiment_id: int) -> Response:
