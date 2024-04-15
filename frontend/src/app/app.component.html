@@ -1,34 +1,73 @@
 <mat-tab-group (selectedTabChange)="onTabChanged($event)">
-  <mat-tab label="Data Gathering">
+  <!-- Data Collection Tab -->
+  <mat-tab label="Data Collection">
     <div style="padding: 20px;">
       <p>Choose an experiment to start gathering data.</p>
-      <mat-form-field appearance="fill">
-        <mat-label>Choose an experiment</mat-label>
-        <mat-select [(value)]="selectedExperimentId" (selectionChange)="onExperimentSelected($event.value)">
-          <mat-option *ngFor="let experiment of experiments" [value]="experiment.id">
-            {{ experiment.name }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-      <br>
-      <button mat-raised-button color="primary" (click)="addNewExperiment()">+ New Experiment</button>
-    </div>
-    
-    <!-- Rest of your Data Gathering content -->
-    <div *ngIf="selectedExperimentId">
-      <button mat-raised-button color="primary" (click)="captureData()">Capture Data</button>
-    
-      <!-- Display the last captured data if available -->
-      <div *ngIf="lastCapturedData" style="max-width: 50%; margin: 0 auto; padding: 20px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); border-radius: 10px;">
-        <img [src]="'/static/images/' + lastCapturedData.image_filename" alt="Captured Image" style="max-width: 100%; max-height: 400px; display: block; margin: 0 auto;">
-        <div style="text-align: center; padding-top: 10px;">
-          <p>Temperature: {{ lastCapturedData.temperature }}°C</p>
-          <p>Humidity: {{ lastCapturedData.humidity }}%</p>
-        </div>
+
+      <div style="display: flex; align-items: center;">
+        <!-- Experiment Selection Form -->
+        <mat-form-field appearance="fill">
+          <mat-label>Choose an experiment</mat-label>
+          <mat-select [(value)]="selectedExperimentId" (selectionChange)="onExperimentSelected($event.value)">
+            <!-- List existing experiments as options -->
+            <mat-option *ngFor="let experiment of experiments" [value]="experiment.id">
+              {{ experiment.name }}
+            </mat-option>
+            <!-- Special option to add a new experiment -->
+            <mat-option (click)="addNewExperiment()">+ New Experiment</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Experiment Settings Menu -->
+        <button *ngIf="selectedExperimentId" mat-icon-button [matMenuTriggerFor]="menu">
+          <span class="material-symbols-outlined">
+            settings
+          </span>
+        </button>
+        <mat-menu #menu="matMenu">
+          <button mat-menu-item (click)="exportExperiment()">
+            <span>Export</span>
+          </button>
+          <button mat-menu-item (click)="deleteExperiment()">
+            <span>Delete</span>
+          </button>
+        </mat-menu>
       </div>
+    </div>
+
+    <!-- Data Entry Capture -->
+    <div *ngIf="selectedExperimentId">
       
+      <div style="display: flex; align-items: center; padding: 20px">
+      <button mat-raised-button color="primary" (click)="toggleCapture()" style="margin-right: 20px;">
+        {{ captureActive ? 'Stop Capture' : 'Capture Data' }}
+      </button>
+
+      <mat-slider
+        min="0"
+        max="60"
+        step="1"
+        showTickMarks
+        discrete
+        [displayWith]="formatLabel">
+        <input matSliderThumb [(ngModel)]="captureInterval">
+      </mat-slider>
+      <span>Interval: {{ captureInterval }} seconds</span>
+      </div>
+
+      <!-- Grid List -->
+      <mat-grid-list cols="10" rowHeight="1:1" gutterSize="5px">
+        <mat-grid-tile *ngFor="let entry of selectedExperimentDataEntries">
+          <div class="data-entry-thumbnail" (click)="openModal(entry)">
+            <img [src]="'/static/images/' + entry.image_filename" [alt]="entry.image_filename" style="width: 100%; height: auto;">
+          </div>
+        </mat-grid-tile>
+      </mat-grid-list>
+
     </div>
   </mat-tab>
+
+  <!-- Sensor View Graph Tab -->
   <mat-tab label="Live Sensor View">
     <div id="sensorGraphs">
       <div id="temperatureGraph" style="width:100%;height:500px;"></div>
@@ -36,7 +75,3 @@
     </div>
   </mat-tab>
 </mat-tab-group>
-
-
-
-<router-outlet />

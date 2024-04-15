@@ -1,4 +1,19 @@
-import { Component, AfterViewInit, ChangeDetectorRef } from '@angular/core';
+import { 
+  Component, 
+  AfterViewInit, 
+  ChangeDetectorRef, 
+  Inject, 
+  OnDestroy 
+} from '@angular/core';
+import {
+  MatDialog,
+  MatDialogRef,
+  MatDialogActions,
+  MatDialogClose,
+  MatDialogTitle,
+  MatDialogContent,
+} from '@angular/material/dialog';
+import { CommonModule, DatePipe } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatSelectModule } from '@angular/material/select';
@@ -7,6 +22,12 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { HttpClient } from '@angular/common/http';
 import { HttpClientModule } from '@angular/common/http';
+import { MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatGridListModule } from '@angular/material/grid-list';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatIconModule } from '@angular/material/icon';
+import { MatSliderModule } from '@angular/material/slider';
+import { FormsModule } from '@angular/forms';
 
 interface Experiment {
   id: string;
@@ -34,24 +55,103 @@ declare var Plotly: any;
   selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet, 
+            CommonModule,
             MatTabsModule,
             MatSelectModule,
             MatButtonModule,
             MatFormFieldModule,
             BrowserAnimationsModule,
-            HttpClientModule],
+            HttpClientModule,
+            MatGridListModule,
+            MatMenuModule,
+            MatIconModule,
+            MatSliderModule,
+            FormsModule],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent {
+export class AppComponent implements AfterViewInit, OnDestroy {
   title = 'droplet-angular';
   // isUpdatingGraph = false;
 
   experiments: FullExperiment[] = [];
   selectedExperimentId: string | null = null;
   lastCapturedData: DataEntry | null = null;
+  captureActive = false;
+  captureInterval: number = 0;
+
+  private captureTimer: any = null;
   
-  constructor(private cdr: ChangeDetectorRef, private http: HttpClient) {}
+  constructor(public dialog: MatDialog, private cdr: ChangeDetectorRef, private http: HttpClient) {}
+
+  formatLabel(value: number): string {
+    if (value >= 1000) {
+      return Math.round(value / 1000) + 'k';
+    }
+
+    if (value === 0) {
+      return 'Instant';
+    }
+
+    return `${value}`;
+  }
+
+  toggleCapture() {
+    this.captureActive = !this.captureActive;
+    if (this.captureActive) {
+      this.startCapture();
+    } else {
+      this.stopCapture();
+    }
+  }
+
+  startCapture() {
+    // Start capturing immediately if the interval is set to instant, otherwise set up an interval
+    if (this.captureInterval === 0) {
+      this.captureData(); // Single capture if it's instant
+    } else {
+      this.captureTimer = setInterval(() => this.captureData(), this.captureInterval * 1000);
+    }
+  }
+  
+
+  captureData() {
+    this.http.post<{id: number}>('/api/data/capture', {}).subscribe({
+      next: (response) => {
+        console.log('Data captured:', response);
+        const entryId = response.id;
+        this.http.get<DataEntry>(`/api/experiments/${this.selectedExperimentId}/data/${entryId}`).subscribe({
+          next: (dataEntry) => {
+            const experiment = this.experiments.find(ex => ex.id === this.selectedExperimentId);
+            if (experiment && experiment.data_entries) {
+              experiment.data_entries.unshift(dataEntry);
+              this.lastCapturedData = dataEntry;
+              this.cdr.detectChanges();
+            }
+          },
+          error: (error) => console.error('Error fetching data entry details:', error)
+        });
+      },
+      error: (error) => console.error('Error capturing data:', error)
+    });
+  
+    // Automatically stop the capture if it is set to instant
+    if (this.captureInterval === 0) {
+      this.stopCapture();
+    }
+  }
+
+  stopCapture() {
+    if (this.captureTimer) {
+      clearInterval(this.captureTimer);
+      this.captureTimer = null;
+      this.captureActive = false;
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.stopCapture();
+  }
 
   fetchExperiments() {
     this.http.get<FullExperiment[]>('/api/experiments').subscribe({
@@ -91,7 +191,7 @@ export class AppComponent {
       this.http.post<Experiment>('/api/experiments', { name, description: description || '' }).subscribe({
         next: (experiment) => {
           this.experiments.push(experiment);
-          this.selectedExperimentId = experiment.id;
+          this.onExperimentSelected(experiment.id);
           this.cdr.detectChanges();
         },
         error: (error) => console.error('Error creating experiment:', error)
@@ -102,8 +202,14 @@ export class AppComponent {
   onExperimentSelected(event: any) {
     console.log('Experiment selected:', event);
     this.selectedExperimentId = event;
-
-    // Send id back to server
+    
+    // Fetch all data entries for the selected experiment
+    const selectedExperiment = this.experiments.find(ex => ex.id === this.selectedExperimentId);
+    if (selectedExperiment) {
+      selectedExperiment.data_entries = selectedExperiment.data_entries;
+      this.cdr.detectChanges();
+    }
+    // Notify backend about the selected experiment
     this.http.post(`/api/experiments/select/${this.selectedExperimentId}`, {}).subscribe({
       next: (response) => {
         console.log('Experiment selection confirmed:', response);
@@ -112,24 +218,38 @@ export class AppComponent {
     });
   }
 
-  captureData() {
-    // Step 1: Capture the data
-    this.http.post<{id: number}>('/api/data/capture', {}).subscribe({
-      next: (response) => {
-        console.log('Data captured:', response);
-        const entryId = response.id;
+  get selectedExperimentDataEntries() {
+    return this.experiments.find(ex => ex.id === this.selectedExperimentId)?.data_entries;
+  }
   
-        // Step 2: Fetch the full DataEntry details using the returned ID
-        this.http.get<DataEntry>(`/api/experiments/${this.selectedExperimentId}/data/${entryId}`).subscribe({
-          next: (dataEntry) => {
-            this.lastCapturedData = dataEntry; // Store the full DataEntry details
-            this.cdr.detectChanges(); // Trigger change detection to update the UI
-          },
-          error: (error) => console.error('Error fetching data entry details:', error)
-        });
+  exportExperiment() {
+    this.http.get(`/api/experiments/${this.selectedExperimentId}/export`, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Experiment_${this.selectedExperimentId}.zip`;  // Set the filename here
+        document.body.appendChild(a);
+        a.click();  // Start the download
+        window.URL.revokeObjectURL(url);  // Clean up after download
+        a.remove();  // Remove the temporary link
       },
-      error: (error) => console.error('Error capturing data:', error)
+      error: (error) => console.error('Error exporting experiment:', error)
     });
+  }
+
+  deleteExperiment() {
+    if (confirm('Are you sure you want to delete this experiment?')) {
+      this.http.delete(`/api/experiments/${this.selectedExperimentId}`).subscribe({
+        next: (response) => {
+          console.log('Experiment deleted:', response);
+          this.fetchExperiments();
+          this.selectedExperimentId = null;
+          this.cdr.detectChanges();
+        },
+        error: (error) => console.error('Error deleting experiment:', error)
+      });
+    }
   }
 
   initGraphs() {
@@ -209,4 +329,38 @@ export class AppComponent {
       this.updateGraph();
     }
   }
+
+  openModal(dataEntry: DataEntry) {
+    console.log('Opening modal with data:', dataEntry)
+    let dialogRef = this.dialog.open(DataEntryDetailDialog, {
+      data: { 
+        entry: dataEntry,
+      },
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      console.log('The dialog was closed');
+    });
+  }
+}
+
+@Component({
+  selector: 'data-entry-detail-dialog',
+  templateUrl: 'data-entry-detail-dialog.html',
+  styleUrls: ['./data-entry-detail-dialog.scss'],
+  standalone: true,
+  imports: [CommonModule,
+            DatePipe, 
+            MatButtonModule, 
+            MatDialogActions, 
+            MatDialogClose, 
+            MatDialogTitle, 
+            MatDialogContent],
+})
+export class DataEntryDetailDialog {
+  // This doesn't work. Works in Stackblitz, but not here. Tried Input() and services, but no luck.
+  // After 4 hours of trying to literally just send data to a dialog, I'm giving up.
+  constructor(
+    @Inject(MAT_DIALOG_DATA) public data: { entry: DataEntry }) {
+    console.log('Data received in dialog:', data)  }
 }

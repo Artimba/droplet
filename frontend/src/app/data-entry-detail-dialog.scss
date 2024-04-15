@@ -1,0 +1,30 @@
+.dialog-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .img-container {
+    flex: 1;
+    padding: 10px;
+  }
+  
+  .img-container img {
+    width: 100%;
+    max-width: 300px; /* Adjust as needed */
+    height: auto;
+    border: 1px solid #ccc; /* Optional border for the image */
+  }
+  
+  .data-details {
+    flex: 2;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  
+  .data-details p {
+    margin: 5px 0;
+  }
+  

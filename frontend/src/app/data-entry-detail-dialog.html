@@ -1,0 +1,14 @@
+<h1 mat-dialog-title>Data Entry Details</h1>
+<mat-dialog-content class="dialog-content">
+  <div class="img-container">
+    <img [src]="'/static/images/' + data.entry.image_filename" [alt]="data.entry.image_filename">
+  </div>
+  <div class="data-details">
+    <p><strong>Temperature:</strong> {{ data.entry.temperature }}°C</p>
+    <p><strong>Humidity:</strong> {{ data.entry.humidity }}%</p>
+    <p><strong>Taken at:</strong> {{ data.entry.timestamp | date }}</p>
+  </div>
+</mat-dialog-content>
+<mat-dialog-actions>
+  <button mat-button mat-dialog-close>Close</button>
+</mat-dialog-actions>

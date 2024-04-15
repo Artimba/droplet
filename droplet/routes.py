@@ -1,4 +1,5 @@
-from flask import Blueprint, jsonify, render_template, send_from_directory, abort, current_app, Response, request
+from flask import Blueprint, jsonify, render_template, send_from_directory, abort, current_app, Response, request, send_file
+from werkzeug.utils import secure_filename
 import plotly
 import plotly.graph_objs as go
 import json
@@ -8,20 +9,15 @@ import requests
 from droplet.utils import capture_image, read_sensor_data
 from .models import DataEntry, Experiment
 from . import db
+import zipfile
+from os import path
+from io import BytesIO
 
 # Blueprint for main routes
 bp = Blueprint('main', __name__)
 
 current_experiment = -1
 
-# @bp.route('/')
-# def index() -> str:
-#     return render_template('index.html')
-
-# @bp.route('/live-graph')
-# def live_graph() -> str:
-#     return render_template('live_graph.html')
-    
 @bp.route('/api/data/capture', methods=['POST'])
 def capture() -> Response:
     """Send an instruction to the Canon camera to capture and download an image. 
@@ -43,22 +39,6 @@ def capture() -> Response:
     db.session.add(new_entry)
     db.session.commit()
     return jsonify({'id': new_entry.id})
-
-
-# @bp.route('/api/entry/<int:entry_id>')
-# def get_entry(entry_id):
-#     entry = DataEntry.query.get(entry_id)
-#     if entry:
-#         return jsonify({
-#             'id': entry.id,
-#             'temperature': entry.temperature,
-#             'humidity': entry.humidity,
-#             'image_filename': entry.image_filename,
-#             'timestamp': entry.timestamp.isoformat()
-#         })
-#     else:
-#         return jsonify({'error': 'Entry not found'}), 404
-
 
 @bp.route('/static/images/<filename>')
 def serve_image(filename: str) -> Response:
@@ -157,8 +137,7 @@ def delete_experiment(experiment_id: int) -> Response:
     """
     experiment = Experiment.query.get(experiment_id)
     if experiment:
-        db.session.delete(experiment)
-        db.session.commit()
+        experiment.delete()
         return jsonify({'message': 'Experiment deleted'})
     else:
         return jsonify({'error': 'Experiment not found'}), 404
@@ -170,6 +149,41 @@ def update_current_experiment(experiment_id):
     current_experiment = experiment_id
     return jsonify({'message': 'Current experiment set', 'current_experiment_id': current_experiment})
 
+
+@bp.route('/api/experiments/<int:experiment_id>/export', methods=['GET'])
+def export_experiment(experiment_id: int) -> Response:
+    """Export data from a specific experiment
+
+    Args:
+        experiment_id (int): ID of experiment to export
+
+    Returns:
+        Response: JSON response containing data from the experiment
+    """
+    experiment = Experiment.query.get(experiment_id)
+    if not experiment:
+        return jsonify({'error': 'Experiment not found'}), 404
+    
+    data = BytesIO()
+    with zipfile.ZipFile(data, mode='w', compression=zipfile.ZIP_DEFLATED) as z:
+        for entry in experiment.data_entries:
+            # Add image to zip
+            image_path = path.join(current_app.config['IMAGE_DIRECTORY'], entry.image_filename)
+            if path.exists(image_path):
+                z.write(image_path, arcname=f"{entry.id}/{entry.image_filename}")
+            
+            # Create a text file for rest of data
+            data_content = f"Timestamp: {entry.timestamp}\nTemperature: {entry.temperature}°C\nHumidity: {entry.humidity}%"
+            z.writestr(f"{entry.id}/data.txt", data_content)
+    
+    data.seek(0) # Go to beginning of buffer before sending.
+    export_name = secure_filename(f'Experiment{experiment_id}.zip')
+    return send_file(
+        data,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=export_name
+    )
 
 # Create a data entry for a given experiment id.
 @bp.route('/api/experiments/<int:experiment_id>/data', methods=['POST'])
@@ -239,5 +253,24 @@ def update_data_entry(experiment_id: int, entry_id: int) -> Response:
         entry.image_filename = data['image_filename']
         db.session.commit()
         return jsonify(entry.to_dict())
+    else:
+        return jsonify({'error': 'Data entry not found'}), 404
+    
+# Delete a specific data entry for a specific experiment
+@bp.route('/api/experiments/<int:experiment_id>/data/<int:entry_id>', methods=['DELETE'])
+def delete_data_entry(experiment_id: int, entry_id: int) -> Response:
+    """Delete a specific data entry for a specific experiment
+
+    Args:
+        experiment_id (int): ID of experiment containing data entry
+        entry_id (int): ID of data entry to delete
+
+    Returns:
+        Response: JSON response indicating success or failure
+    """
+    entry = DataEntry.query.get(entry_id)
+    if entry and entry.experiment_id == experiment_id:
+        entry.delete()
+        return jsonify({'message': 'Data entry deleted'})
     else:
         return jsonify({'error': 'Data entry not found'}), 404

@@ -162,3 +162,5 @@ cython_debug/
 
 droplet/static/angular/*
 droplet/static/angular/
+
+instance/*

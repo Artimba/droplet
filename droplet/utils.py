@@ -94,10 +94,13 @@ def mock_capture_image(shot_time: str, pic_id: int) -> str:
     # Make a copy of droplet_20240404T133433.jpg, assigning it a new name.
     # This is to simulate the capture_image function.
     image_directory = current_app.config['IMAGE_DIRECTORY']
-    source_filename = "droplet_20240404T133433.jpg"
+    # Grab a random image from the image directory.
+    source_filename = random.choice(os.listdir(image_directory))
+    # source_filename = "droplet_20240408T115712.jpg"
     source_file = os.path.join(image_directory, source_filename)
     dir = os.path.dirname(source_file)
     dest_filename = pic_id + "_" + shot_time + ".jpg"
     dest_path = os.path.join(dir, dest_filename)
     copyfile(source_file, dest_path)
+    print(f"Mock image captured. Saved to {dest_path}")
     return dest_filename

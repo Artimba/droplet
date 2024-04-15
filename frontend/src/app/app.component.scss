@@ -1,0 +1,42 @@
+mat-grid-list {
+  position: relative; /* Position the grid list relatively */
+  border: 4px solid #251b1b; /* Add border to the grid list */
+  box-sizing: border-box; /* Ensure the border is included in the size */
+}
+
+mat-grid-tile {
+  transition: transform 0.3s;
+  overflow: visible; /* Allow the content to show outside the bounds */
+  z-index: 1; /* Default z-index for all tiles */
+  // border: 2px solid #2b0202; /* Add border to the tiles */
+  // box-sizing: border-box; /* Ensure the border is included in the size */
+}
+
+/* When hovering over the grid tile, increase its z-index */
+mat-grid-tile:hover {
+  z-index: 2;
+}
+
+.data-entry-thumbnail {
+  cursor: pointer;
+  height: 100%; /* Ensure the thumbnail covers the entire tile */
+  position: relative; /* Position the thumbnail relatively within the tile */
+}
+
+/* Scale up the image, not the tile, on hover */
+.data-entry-thumbnail img:hover {
+  transform: scale(1.2); /* Adjust scale as needed */
+  z-index: 3; /* Ensure the image is above other tiles when scaled */
+  // border: 2px solid #0c0101; /* Add border to the image */
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2); /* Optional: add shadow for better visibility */
+}
+
+.data-entry-thumbnail img {
+  width: 100%;
+  height: auto; /* Change to auto to maintain aspect ratio */
+  object-fit: cover;
+}
+
+mat-slider {
+  width: 300px;
+}
